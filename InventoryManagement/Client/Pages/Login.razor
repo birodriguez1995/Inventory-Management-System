@@ -1,0 +1,172 @@
+@page "/"
+@page "/login"
+@layout EmptyLayout
+@inject IApiService Api
+@inject AuthStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<PageTitle>Sign In — Inventory</PageTitle>
+
+<div class="login-page">
+    <!-- Left panel: brand + hero -->
+    <div class="login-left">
+        <div class="login-brand">
+            <div class="login-brand-icon">
+                <i class="fa-solid fa-boxes-stacked"></i>
+            </div>
+            <div class="login-brand-name">Inventory</div>
+        </div>
+        <h1 class="login-headline">Smart <span>Inventory</span><br />at your fingertips.</h1>
+        <p class="login-description">
+            Track products, manage stock movements, and stay on top of
+            low-stock alerts — all in one clean dashboard.
+        </p>
+        <div class="login-features">
+            <div class="login-feature">
+                <div class="login-feature-dot"></div>
+                Real-time stock tracking
+            </div>
+            <div class="login-feature">
+                <div class="login-feature-dot"></div>
+                Inbound &amp; outbound movement history
+            </div>
+            <div class="login-feature">
+                <div class="login-feature-dot"></div>
+                Automatic low-stock alerts
+            </div>
+        </div>
+    </div>
+
+    <!-- Right panel: login / register card -->
+    <div class="login-right">
+        <div class="login-card">
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger" style="margin-bottom:1.25rem;">
+                    <i class="fa-solid fa-circle-exclamation"></i> @_error
+                </div>
+            }
+
+            @if (_showRegister)
+            {
+                <div class="login-card-header">
+                    <div class="login-card-title">Create account</div>
+                    <div class="login-card-subtitle">Join to manage your inventory</div>
+                </div>
+                <EditForm Model="_register" OnValidSubmit="HandleRegisterAsync">
+                    <DataAnnotationsValidator />
+                    <div class="login-form-group">
+                        <label class="form-label">Email address</label>
+                        <div class="login-input-wrapper">
+                            <i class="fa-solid fa-envelope login-input-icon"></i>
+                            <InputText class="login-input" @bind-Value="_register.Email" placeholder="you@example.com" />
+                        </div>
+                        <ValidationMessage For="() => _register.Email" class="validation-message" />
+                    </div>
+                    <div class="login-form-group">
+                        <label class="form-label">Password</label>
+                        <div class="login-input-wrapper">
+                            <i class="fa-solid fa-lock login-input-icon"></i>
+                            <InputText class="login-input" @bind-Value="_register.Password" type="password" placeholder="Min. 6 characters, at least one digit" />
+                        </div>
+                        <ValidationMessage For="() => _register.Password" class="validation-message" />
+                    </div>
+                    <button class="login-btn" type="submit" disabled="@_loading">
+                        @if (_loading) { <i class="fa-solid fa-spinner fa-spin"></i> <span>Creating account…</span> }
+                        else { <i class="fa-solid fa-user-plus"></i> <span>Create Account</span> }
+                    </button>
+                </EditForm>
+                <div class="login-toggle">
+                    Already have an account?
+                    <a @onclick="() => _showRegister = false">Sign in</a>
+                </div>
+            }
+            else
+            {
+                <div class="login-card-header">
+                    <div class="login-card-title">Welcome back</div>
+                    <div class="login-card-subtitle">Sign in to your account</div>
+                </div>
+                <EditForm Model="_login" OnValidSubmit="HandleLoginAsync">
+                    <DataAnnotationsValidator />
+                    <div class="login-form-group">
+                        <label class="form-label">Email address</label>
+                        <div class="login-input-wrapper">
+                            <i class="fa-solid fa-envelope login-input-icon"></i>
+                            <InputText class="login-input" @bind-Value="_login.Email" placeholder="admin@inventory.local" />
+                        </div>
+                        <ValidationMessage For="() => _login.Email" class="validation-message" />
+                    </div>
+                    <div class="login-form-group">
+                        <label class="form-label">Password</label>
+                        <div class="login-input-wrapper">
+                            <i class="fa-solid fa-lock login-input-icon"></i>
+                            <InputText class="login-input" @bind-Value="_login.Password" type="password" placeholder="••••••••" />
+                        </div>
+                        <ValidationMessage For="() => _login.Password" class="validation-message" />
+                    </div>
+                    <button class="login-btn" type="submit" disabled="@_loading">
+                        @if (_loading) { <i class="fa-solid fa-spinner fa-spin"></i> <span>Signing in…</span> }
+                        else { <i class="fa-solid fa-right-to-bracket"></i> <span>Sign In</span> }
+                    </button>
+                </EditForm>
+                <div class="login-divider">demo credentials</div>
+                <div class="login-hint">
+                    <strong>admin@inventory.local</strong> &nbsp;·&nbsp; <strong>Admin1234!</strong>
+                </div>
+                <div class="login-toggle">
+                    Don't have an account?
+                    <a @onclick="() => _showRegister = true">Register</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    private readonly LoginRequest _login = new();
+    private readonly RegisterRequest _register = new();
+    private string? _error;
+    private bool _loading;
+    private bool _showRegister;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+            Redirect();
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        _error = null;
+        _loading = true;
+        var (response, error) = await Api.LoginAsync(_login);
+        _loading = false;
+
+        if (response is null) { _error = error; return; }
+
+        await AuthProvider.LoginAsync(response);
+        Redirect();
+    }
+
+    private async Task HandleRegisterAsync()
+    {
+        _error = null;
+        _loading = true;
+        var (success, error) = await Api.RegisterAsync(_register);
+        _loading = false;
+
+        if (!success) { _error = error; return; }
+
+        // Auto-login after register
+        var (response, loginError) = await Api.LoginAsync(new LoginRequest { Email = _register.Email, Password = _register.Password });
+        if (response is not null) { await AuthProvider.LoginAsync(response); Redirect(); }
+        else { _error = loginError ?? "Registration succeeded but auto-login failed."; _showRegister = false; }
+    }
+
+    private void Redirect() =>
+        Nav.NavigateTo(string.IsNullOrEmpty(ReturnUrl) ? "products" : ReturnUrl, forceLoad: false);
+}

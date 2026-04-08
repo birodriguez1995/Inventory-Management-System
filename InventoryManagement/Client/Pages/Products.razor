@@ -1,0 +1,193 @@
+@page "/products"
+@attribute [Authorize]
+@inject IApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>Products — Inventory</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Products</h1>
+        <p class="page-subtitle">
+            @_products.Count product(s) &nbsp;·&nbsp;
+            @_products.Count(p => p.QuantityInStock <= LowStockThreshold) low-stock
+        </p>
+    </div>
+    <a class="btn btn-primary" href="products/new">
+        <i class="fa-solid fa-plus"></i> New Product
+    </a>
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar">
+    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;">
+        <i class="fa-solid fa-filter" style="color:var(--color-text-muted);font-size:13px;flex-shrink:0;"></i>
+        <input class="form-control" list="cat-dl"
+               placeholder="Filter by category…"
+               @bind="_categoryFilter" @bind:event="oninput" @onkeyup="ApplyFilter" />
+    </div>
+    <datalist id="cat-dl">
+        @foreach (var cat in _allCategories)
+        {
+            <option value="@cat" />
+        }
+    </datalist>
+    <div class="input-group" style="max-width:230px;">
+        <span class="input-group-text">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </span>
+        <input class="form-control" type="number" min="0"
+               placeholder="Low-stock ≤"
+               @bind="_lowStockFilter" @bind:event="oninput" @onkeyup="ApplyFilter" />
+    </div>
+    <button class="btn btn-secondary" @onclick="ClearFiltersAsync">
+        <i class="fa-solid fa-xmark"></i> Clear
+    </button>
+</div>
+
+@if (_loading)
+{
+    <div class="spinner">
+        <div class="spinner-ring"></div>
+        <span>Loading products…</span>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-circle-exclamation"></i> @_error
+    </div>
+}
+else if (_products.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-box-open"></i></div>
+        <div class="empty-state-text">No products found. <a href="products/new">Create one.</a></div>
+    </div>
+}
+else
+{
+    <table class="inv-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th style="text-align:right;">Stock</th>
+                <th style="text-align:right;">Unit Price</th>
+                <th>Created By</th>
+                <th style="width:100px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _products)
+            {
+                <tr class="@(p.QuantityInStock <= LowStockThreshold ? "row-warning" : "")">
+                    <td>
+                        <a href="products/@p.Id" style="font-weight:600;color:var(--color-text);">@p.Name</a>
+                        @if (p.QuantityInStock <= LowStockThreshold)
+                        {
+                            <span class="badge badge-danger" style="margin-left:6px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Low Stock
+                            </span>
+                        }
+                    </td>
+                    <td><code>@p.SKU</code></td>
+                    <td><span class="badge badge-info">@p.Category</span></td>
+                    <td style="text-align:right;">
+                        <span class="badge @(p.QuantityInStock <= LowStockThreshold ? "badge-danger" : "badge-success")"
+                              style="font-size:0.8rem;padding:4px 10px;">
+                            @p.QuantityInStock
+                        </span>
+                    </td>
+                    <td style="text-align:right;font-weight:500;">@p.UnitPrice.ToString("C")</td>
+                    <td style="color:var(--color-text-muted);font-size:0.8rem;">@(p.CreatedBy ?? "—")</td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <a class="btn btn-sm btn-outline-primary" href="products/@p.Id/edit">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(p)">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p style="font-size:0.75rem;color:var(--color-text-muted);margin-top:0.75rem;padding:0 0.25rem;">
+        Rows highlighted in yellow have stock ≤ @LowStockThreshold units.
+    </p>
+}
+
+@if (_confirmDelete is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">
+                <i class="fa-solid fa-trash-can" style="color:var(--color-danger);margin-right:6px;"></i>Delete Product
+            </div>
+            <div class="modal-body">
+                Are you sure you want to permanently delete <strong>@_confirmDelete.Name</strong>?
+                <br /><br />
+                SKU: <code>@_confirmDelete.SKU</code> — this action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => _confirmDelete = null">Cancel</button>
+                <button class="btn btn-primary" style="background:var(--color-danger);border:none;" @onclick="ConfirmDeleteAsync">
+                    <i class="fa-solid fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const int LowStockThreshold = 10;
+
+    private List<ProductDto> _products = [];
+    private List<string> _allCategories = [];
+    private bool _loading = true;
+    private string? _error;
+    private string? _categoryFilter;
+    private int? _lowStockFilter;
+    private ProductDto? _confirmDelete;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _products = await Api.GetProductsAsync(
+                string.IsNullOrWhiteSpace(_categoryFilter) ? null : _categoryFilter.Trim(),
+                _lowStockFilter);
+            _allCategories = _products.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task ApplyFilter() => await LoadAsync();
+
+    private async Task ClearFiltersAsync()
+    {
+        _categoryFilter = null;
+        _lowStockFilter = null;
+        await LoadAsync();
+    }
+
+    private void ConfirmDelete(ProductDto product) => _confirmDelete = product;
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_confirmDelete is null) return;
+        var (ok, error) = await Api.DeleteProductAsync(_confirmDelete.Id);
+        _confirmDelete = null;
+        if (!ok) { _error = error; return; }
+        await LoadAsync();
+    }
+}

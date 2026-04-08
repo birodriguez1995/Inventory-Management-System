@@ -1,0 +1,242 @@
+@page "/products/{Id:int}"
+@attribute [Authorize]
+@inject IApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_product?.Name ?? "Product") — Inventory</PageTitle>
+
+@if (_loading)
+{
+    <div class="spinner">
+        <div class="spinner-ring"></div>
+        <span>Loading product…</span>
+    </div>
+}
+else if (_product is null)
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-circle-exclamation"></i> @(_error ?? "Product not found.")
+    </div>
+}
+else
+{
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="products"><i class="fa-solid fa-box-open"></i> Products</a></li>
+        <li class="breadcrumb-item active">@_product.Name</li>
+    </ol>
+
+    <!-- Product Info Card -->
+    <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="stat-icon purple" style="width:40px;height:40px;font-size:16px;flex-shrink:0;">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:1.05rem;">@_product.Name</div>
+                    <div style="font-size:0.75rem;color:var(--color-text-muted);font-weight:400;margin-top:2px;">
+                        <code>@_product.SKU</code> &nbsp;·&nbsp; <span class="badge badge-info">@_product.Category</span>
+                    </div>
+                </div>
+            </div>
+            <a class="btn btn-sm btn-outline-primary" href="products/@_product.Id/edit">
+                <i class="fa-solid fa-pen"></i> Edit
+            </a>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="detail-label">SKU</span>
+                <span class="detail-value"><code>@_product.SKU</code></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Category</span>
+                <span class="detail-value">@_product.Category</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">In Stock</span>
+                <span class="detail-value" style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:1.15rem;font-weight:700;">@_product.QuantityInStock</span>
+                    @if (_product.QuantityInStock <= 10)
+                    {
+                        <span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-success"><i class="fa-solid fa-check"></i> OK</span>
+                    }
+                </span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Unit Price</span>
+                <span class="detail-value" style="font-weight:700;">@_product.UnitPrice.ToString("C")</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Created</span>
+                <span class="detail-value">@_product.CreatedAt.ToLocalTime().ToString("g")</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Created By</span>
+                <span class="detail-value">@(_product.CreatedBy ?? "—")</span>
+            </div>
+            @if (!string.IsNullOrEmpty(_product.UpdatedBy))
+            {
+                <div class="detail-item" style="grid-column:1/-1;">
+                    <span class="detail-label">Last Updated By</span>
+                    <span class="detail-value">@_product.UpdatedBy</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Register Movement -->
+    <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-header">
+            <i class="fa-solid fa-arrow-right-arrow-left" style="color:var(--color-primary);"></i>
+            Register Stock Movement
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(_movementError))
+            {
+                <div class="alert alert-danger">
+                    <i class="fa-solid fa-circle-exclamation"></i> @_movementError
+                </div>
+            }
+            @if (_movementSuccess)
+            {
+                <div class="alert alert-success">
+                    <i class="fa-solid fa-circle-check"></i> Movement registered successfully!
+                </div>
+            }
+            <EditForm Model="_movement" OnValidSubmit="RegisterMovementAsync">
+                <DataAnnotationsValidator />
+                <div style="display:grid;grid-template-columns:160px 110px 1fr 130px;gap:12px;align-items:end;">
+                    <div>
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-select" @bind-Value="_movement.Type">
+                            <option value="">— Select —</option>
+                            <option value="Inbound">Inbound (add)</option>
+                            <option value="Outbound">Outbound (remove)</option>
+                        </InputSelect>
+                        <ValidationMessage For="() => _movement.Type" class="validation-message" />
+                    </div>
+                    <div>
+                        <label class="form-label">Quantity</label>
+                        <InputNumber class="form-control" @bind-Value="_movement.Quantity" min="1" />
+                        <ValidationMessage For="() => _movement.Quantity" class="validation-message" />
+                    </div>
+                    <div>
+                        <label class="form-label">Reason <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                        <InputText class="form-control" @bind-Value="_movement.Reason" placeholder="e.g. Purchase order #42" />
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" style="width:100%;" type="submit" disabled="@_savingMovement">
+                            @if (_savingMovement) { <i class="fa-solid fa-spinner fa-spin"></i> }
+                            else { <i class="fa-solid fa-plus"></i> }
+                            <span>@(_savingMovement ? "Saving…" : "Register")</span>
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <!-- Movement History -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fa-solid fa-clock-rotate-left" style="color:var(--color-text-muted);"></i>
+            Movement History
+            <span class="badge badge-gray" style="margin-left:auto;">@_movements.Count</span>
+        </div>
+        @if (_movements.Count == 0)
+        {
+            <div class="empty-state" style="padding:2rem;">
+                <div class="empty-state-icon"><i class="fa-solid fa-inbox"></i></div>
+                <div class="empty-state-text">No movements recorded yet.</div>
+            </div>
+        }
+        else
+        {
+            <table class="inv-table" style="border-radius:0;box-shadow:none;">
+                <thead>
+                    <tr>
+                        <th>Date / Time</th>
+                        <th>Type</th>
+                        <th style="text-align:right;">Qty</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in _movements)
+                    {
+                        <tr>
+                            <td style="white-space:nowrap;color:var(--color-text-muted);font-size:0.8rem;">
+                                @m.Timestamp.ToLocalTime().ToString("g")
+                            </td>
+                            <td>
+                                @if (m.Type == "Inbound")
+                                {
+                                    <span class="badge badge-success">
+                                        <i class="fa-solid fa-arrow-down"></i> Inbound
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">
+                                        <i class="fa-solid fa-arrow-up"></i> Outbound
+                                    </span>
+                                }
+                            </td>
+                            <td style="text-align:right;font-weight:700;color:@(m.Type == "Inbound" ? "var(--color-success)" : "var(--color-danger)");">
+                                @(m.Type == "Outbound" ? $"−{m.Quantity}" : $"+{m.Quantity}")
+                            </td>
+                            <td style="color:var(--color-text-muted);">@(m.Reason ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProductDto? _product;
+    private List<StockMovementDto> _movements = [];
+    private bool _loading = true;
+    private string? _error;
+
+    private CreateStockMovementRequest _movement = new();
+    private bool _savingMovement;
+    private string? _movementError;
+    private bool _movementSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _product = await Api.GetProductAsync(Id);
+            if (_product is not null)
+                _movements = await Api.GetMovementsAsync(Id);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task RegisterMovementAsync()
+    {
+        _movementError = null;
+        _movementSuccess = false;
+        _savingMovement = true;
+
+        var (result, error) = await Api.RegisterMovementAsync(Id, _movement);
+        _savingMovement = false;
+
+        if (result is null) { _movementError = error; return; }
+
+        _movementSuccess = true;
+        _movement = new CreateStockMovementRequest();
+        _product = await Api.GetProductAsync(Id);
+        _movements = await Api.GetMovementsAsync(Id);
+    }
+}

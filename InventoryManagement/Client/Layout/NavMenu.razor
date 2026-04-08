@@ -1,0 +1,61 @@
+﻿@inject AuthStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<a class="sidebar-brand" href="products">
+    <div class="sidebar-brand-icon">
+        <i class="fa-solid fa-boxes-stacked"></i>
+    </div>
+    <div>
+        <div class="sidebar-brand-text">Inventory</div>
+        <div class="sidebar-brand-sub">Management System</div>
+    </div>
+</a>
+
+<nav class="sidebar-nav">
+    <AuthorizeView>
+        <Authorized>
+            <span class="sidebar-section-label">Main Menu</span>
+            <NavLink class="nav-item-link" href="products" Match="NavLinkMatch.Prefix">
+                <span class="nav-icon"><i class="fa-solid fa-box-open"></i></span>
+                Products
+            </NavLink>
+        </Authorized>
+        <NotAuthorized>
+            <NavLink class="nav-item-link" href="login">
+                <span class="nav-icon"><i class="fa-solid fa-right-to-bracket"></i></span>
+                Sign In
+            </NavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</nav>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-avatar">@GetInitial(context.User.Identity?.Name)</div>
+                <div style="min-width:0;">
+                    <div style="color:#fff;font-size:0.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        @context.User.Identity!.Name
+                    </div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);">Administrator</div>
+                </div>
+            </div>
+            <button class="nav-item-link" @onclick="LogoutAsync" style="color:rgba(255,100,100,0.75);">
+                <span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                Sign Out
+            </button>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private static string GetInitial(string? name) =>
+        string.IsNullOrEmpty(name) ? "?" : name[0..1].ToUpper();
+
+    private async Task LogoutAsync()
+    {
+        await AuthProvider.LogoutAsync();
+        Nav.NavigateTo("login", forceLoad: false);
+    }
+}

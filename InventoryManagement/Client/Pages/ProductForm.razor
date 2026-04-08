@@ -1,0 +1,274 @@
+@page "/products/new"
+@page "/products/{Id:int}/edit"
+@attribute [Authorize]
+@inject IApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_isNew ? "New Product" : "Edit Product") — Inventory</PageTitle>
+
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="products"><i class="fa-solid fa-box-open"></i> Products</a></li>
+    @if (!_isNew && !string.IsNullOrEmpty(_form.Name))
+    {
+        <li class="breadcrumb-item"><a href="products/@Id">@_form.Name</a></li>
+    }
+    <li class="breadcrumb-item active">@(_isNew ? "New Product" : "Edit")</li>
+</ol>
+
+<div class="page-header" style="margin-bottom:1.25rem;">
+    <div>
+        <h1 class="page-title">@(_isNew ? "New Product" : "Edit Product")</h1>
+        <p class="page-subtitle">@(_isNew ? "Add a new product to your inventory." : "Update product information.")</p>
+    </div>
+</div>
+
+<div class="card" style="max-width:680px;">
+    <div class="card-header">
+        <i class="fa-solid fa-@(_isNew ? "plus" : "pen")" style="color:var(--color-primary);"></i>
+        Product Information
+    </div>
+    <div class="card-body">
+        @if (_loading)
+        {
+            <div class="spinner" style="padding:2rem 0;">
+                <div class="spinner-ring"></div>
+                <span>Loading…</span>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger">
+                    <i class="fa-solid fa-circle-exclamation"></i> @_error
+                </div>
+            }
+
+            <EditForm Model="_form" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+                    <div style="grid-column:1/-1;">
+                        <label class="form-label">Name <span style="color:var(--color-danger);">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.Name" placeholder="e.g. Wireless Keyboard" />
+                        <ValidationMessage For="() => _form.Name" class="validation-message" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">
+                            SKU <span style="color:var(--color-danger);">*</span>
+                        </label>
+                        <InputText class="form-control" @bind-Value="_form.SKU"
+                                   disabled="@(!_isNew)"
+                                   placeholder="e.g. WKB-2024-BLK" />
+                        @if (!_isNew)
+                        {
+                            <div class="sku-help">
+                                <i class="fa-solid fa-lock fa-xs"></i>
+                                Immutable — all stock movements reference this identifier. Changing it would break historical traceability.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-text">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Stock Keeping Unit — a unique code identifying this product. <strong>Cannot be changed after creation.</strong>
+                            </div>
+                        }
+                        <ValidationMessage For="() => _form.SKU" class="validation-message" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Category <span style="color:var(--color-danger);">*</span></label>
+                        <div class="cat-picker @(_showCategoryDrop ? "open" : "")">
+                            <div class="cat-picker-trigger">
+                                <i class="fa-solid fa-tag cat-picker-icon"></i>
+                                <input class="cat-picker-input"
+                                       value="@_form.Category"
+                                       placeholder="Search or type a category…"
+                                       autocomplete="off"
+                                       @oninput="OnCategoryInput"
+                                       @onfocus="() => _showCategoryDrop = true"
+                                       @onblur="HideCategoryDropAsync" />
+                                <i class="fa-solid fa-chevron-down cat-picker-chevron"></i>
+                            </div>
+                            @if (_showCategoryDrop)
+                            {
+                                var filtered = string.IsNullOrWhiteSpace(_categorySearch)
+                                    ? _categories
+                                    : _categories.Where(c => c.Contains(_categorySearch, StringComparison.OrdinalIgnoreCase)).ToList();
+                                <div class="cat-picker-dropdown">
+                                    @if (filtered.Any())
+                                    {
+                                        @foreach (var cat in filtered)
+                                        {
+                                            var isSelected = cat == _form.Category;
+                                            <button type="button"
+                                                    class="cat-picker-option @(isSelected ? "selected" : "")"
+                                                    @onmousedown:preventDefault
+                                                    @onclick="() => SelectCategory(cat)">
+                                                <span class="cat-opt-icon">
+                                                    <i class="fa-solid fa-tag"></i>
+                                                </span>
+                                                @cat
+                                                @if (isSelected)
+                                                {
+                                                    <i class="fa-solid fa-check cat-opt-check"></i>
+                                                }
+                                            </button>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="cat-picker-empty">No matches — press Enter to use "@_categorySearch"</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <ValidationMessage For="() => _form.Category" class="validation-message" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Quantity in Stock <span style="color:var(--color-danger);">*</span></label>
+                        <InputNumber class="form-control" @bind-Value="_form.QuantityInStock" min="0" />
+                        <ValidationMessage For="() => _form.QuantityInStock" class="validation-message" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Unit Price <span style="color:var(--color-danger);">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fa-solid fa-dollar-sign"></i></span>
+                            <InputNumber class="form-control" @bind-Value="_form.UnitPrice" min="0.01" step="0.01" />
+                        </div>
+                        <ValidationMessage For="() => _form.UnitPrice" class="validation-message" />
+                    </div>
+
+                </div>
+
+                <div style="display:flex;gap:8px;padding-top:1rem;border-top:1px solid var(--color-border);">
+                    <button class="btn btn-primary" type="submit" disabled="@_saving">
+                        @if (_saving) { <i class="fa-solid fa-spinner fa-spin"></i> }
+                        else if (_isNew) { <i class="fa-solid fa-plus"></i> }
+                        else { <i class="fa-solid fa-floppy-disk"></i> }
+                        <span>@(_saving ? "Saving…" : (_isNew ? "Create Product" : "Save Changes"))</span>
+                    </button>
+                    <a class="btn btn-secondary" href="@(_isNew ? "products" : $"products/{Id}")">
+                        Cancel
+                    </a>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _isNew => !Id.HasValue;
+    private ProductFormModel _form = new();
+    private List<string> _categories = [];
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private bool _showCategoryDrop;
+    private string? _categorySearch;
+
+    private void OnCategoryInput(ChangeEventArgs e)
+    {
+        _form.Category = e.Value?.ToString() ?? "";
+        _categorySearch = _form.Category;
+        _showCategoryDrop = true;
+    }
+
+    private void SelectCategory(string cat)
+    {
+        _form.Category = cat;
+        _categorySearch = null;
+        _showCategoryDrop = false;
+    }
+
+    private async Task HideCategoryDropAsync()
+    {
+        await Task.Delay(150);
+        _showCategoryDrop = false;
+        _categorySearch = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var allProducts = await Api.GetProductsAsync(null, null);
+            _categories = allProducts.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
+
+            if (!_isNew)
+            {
+                var product = await Api.GetProductAsync(Id!.Value);
+                if (product is not null)
+                {
+                    _form.Name = product.Name;
+                    _form.SKU = product.SKU;
+                    _form.Category = product.Category;
+                    _form.QuantityInStock = product.QuantityInStock;
+                    _form.UnitPrice = product.UnitPrice;
+                }
+            }
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _saving = true;
+
+        if (_isNew)
+        {
+            var req = new CreateProductRequest
+            {
+                Name = _form.Name,
+                SKU = _form.SKU,
+                Category = _form.Category,
+                QuantityInStock = _form.QuantityInStock,
+                UnitPrice = _form.UnitPrice
+            };
+            var (product, error) = await Api.CreateProductAsync(req);
+            _saving = false;
+            if (product is null) { _error = error; return; }
+            Nav.NavigateTo($"products/{product.Id}");
+        }
+        else
+        {
+            var req = new UpdateProductRequest
+            {
+                Name = _form.Name,
+                Category = _form.Category,
+                QuantityInStock = _form.QuantityInStock,
+                UnitPrice = _form.UnitPrice
+            };
+            var (product, error) = await Api.UpdateProductAsync(Id!.Value, req);
+            _saving = false;
+            if (product is null) { _error = error; return; }
+            Nav.NavigateTo($"products/{Id}");
+        }
+    }
+
+    private class ProductFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string SKU { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string Category { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(0, int.MaxValue)]
+        public int QuantityInStock { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0.01, double.MaxValue, ErrorMessage = "Price must be > 0.")]
+        public decimal UnitPrice { get; set; }
+    }
+}

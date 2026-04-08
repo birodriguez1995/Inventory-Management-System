@@ -1,0 +1,1 @@
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Release\net8.0\InventoryManagement.Shared.GeneratedMSBuildEditorConfig.editorconfig

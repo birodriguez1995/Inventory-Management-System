@@ -1,0 +1,11 @@
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\bin\Debug\net8.0\InventoryManagement.Shared.deps.json
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\bin\Debug\net8.0\InventoryManagement.Shared.dll
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\bin\Debug\net8.0\InventoryManagement.Shared.pdb
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.AssemblyInfoInputs.cache
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.AssemblyInfo.cs
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.csproj.CoreCompileInputs.cache
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.dll
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\refint\InventoryManagement.Shared.dll
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\InventoryManagement.Shared.pdb
+C:\Users\HP OMEN\Pictures\sistemplan\InventoryManagement\Shared\obj\Debug\net8.0\ref\InventoryManagement.Shared.dll
